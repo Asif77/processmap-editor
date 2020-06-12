@@ -141,7 +141,7 @@ export function updateMap(step: Step) {
 
 export function updateStep(step: Step) {
 	return function(dispatch: any) {
-		dispatch(beginAjaxCall());
+		//dispatch(beginAjaxCall());
 		return dispatch(updateStepSuccess(step));
 	};
 }

@@ -4,18 +4,18 @@ import * as ReactDOM from 'react-dom';
 import { connect } from 'react-redux';
 import { bindActionCreators } from 'redux';
 import bindme from 'bindme';
-import * as d3 from 'd3';
 
 import * as mapActions from '../actions/mapViewActions';
 import * as navActions from '../actions/navActions';
 
-import { MapData, IParam, Step, PlaybackHistory, BpmLocale } from '../interface/map';
+import { MapData, IParam, Step, PlaybackHistory, BpmLocale, Anchor, Link, IEditorContext } from '../interface/map';
 import * as ImageConst from '../components/imageConst';
 import Map from '../components/Map';
 import './MapView.css';
 import PropsPage from '../components/PropsPage';
 import { mapObjectSelection } from '../components/constant';
 import SpeedDials from '../components/SpeedDials';
+import { rect } from '../utils/global';
 //import { Height } from '@material-ui/icons';
 
 class MapView extends React.Component<IMapViewProps, IMapViewState> {
@@ -48,7 +48,6 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 			selected: {},
 			shiftPressed: false,
 			toolbarHeight: props.params.editable ? 64 : 0,
-			drag_line: {},
 			sourcestep: {},
 			destinationstep: {},
 			stepPropsShown: false,
@@ -118,15 +117,10 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 			y: window.scrollY
 		};
 
-		// line displayed when dragging new nodes
-		let svg = d3.select<any, any>('svg');
-		const dragline = svg.append('svg:path').attr('class', 'link dragline hidden').attr('d', 'M0,0 L0,0');
-
 		this.setState({
 			offset,
 			scroll,
-			toolbarHeight: height,
-			drag_line: dragline
+			toolbarHeight: height
 		});
 
 		this.setState({ size: this.getBrowserSize() });
@@ -149,7 +143,6 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 			enablePrevBtn: false,
 			pause: false
 		});
-		console.log('start');
 	};
 
 	stopPlayback = () => {
@@ -237,33 +230,50 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 	};
 
 	getDrawLink = () => {
-		return this.props.nav === mapObjectSelection.Link ? true : false;
+		const { nav } = this.props.editorContext;
+		return nav === mapObjectSelection.Link ? true : false;
 	};
 
 	createArrow = (event: any) => {
 		event.stopPropagation();
 	};
 
-	getCoordinates = (event: any) => {
-		const { offset, scroll } = this.state;
+	getCoordinates = (e: any) => {
+		//const { scroll } = this.state;
+		const svg = document.getElementById('map');
 
 		return {
-			x: event.clientX - offset.x + scroll.x,
-			y: event.clientY - offset.y + scroll.y
+			x: e.pageX - svg.offsetLeft, // + scroll.x,
+			y: e.pageY - svg.offsetTop // + scroll.y
 		};
 	};
 
-	isInsideMap = (coordinates: any) => {
-		const { offset, scroll } = this.state;
-
-		const { Height, Width } = this.props.map;
+	isInside = (coordinates: any) => {
+		const { mapSelection } = this.state;
 
 		return (
-			coordinates.x > offset.x + scroll.x &&
-			coordinates.x < offset.x + scroll.x + Width &&
-			coordinates.y > offset.y + scroll.y &&
-			coordinates.y < offset.y + scroll.y + Height
+			coordinates.x >= mapSelection.x &&
+			coordinates.x <= mapSelection.x + mapSelection.width &&
+			coordinates.y >= mapSelection.y &&
+			coordinates.y <= mapSelection.y + mapSelection.height
 		);
+	};
+
+	setSelection = () => {
+		const { map } = this.props;
+		const steps = [ ...map.Steps ];
+		let selectedStep = {};
+		steps.forEach((step) => {
+			let s = JSON.parse(JSON.stringify(step));
+			if (this.isInside({ x: s.Location.X, y: s.Location.Y })) {
+				selectedStep = Object.assign({}, selectedStep);
+				selectedStep[s.Id] = true;
+			}
+		});
+
+		this.setState({
+			selected: selectedStep
+		});
 	};
 
 	onDocumentKeydown = (event: any) => {
@@ -301,6 +311,43 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 		}
 	};
 
+	calcDocSize = () => {
+		const { map } = this.props;
+		let docRect = new rect(0, 0, 0, 0);
+		map.Steps.forEach((step: Step) => {
+			const { Location } = step;
+			docRect = docRect.union(Location.X, Location.Y, 64, 64);
+		});
+
+		map.TextObjects.forEach((textObject: any, i: any) => {
+			const { Location } = textObject;
+			docRect = docRect.union(Location.X, Location.Y, 20, 20);
+		});
+
+		if (map.SwimColors.length > 0) {
+			let height = map.SwimColors.length * (ImageConst.SWIMCOLORSIZE + ImageConst.SWIMCOLORSGAP);
+			let width = map.SwimColors[0].Name.length;
+			for (let i = 1; i < map.SwimColors.length; i++) {
+				if (map.SwimColors[i].Name.length > width) width = map.SwimColors[i].Name.length;
+			}
+
+			map.SwimPools.forEach((swimPool: any, i: number) => {
+				const { Location } = swimPool;
+				docRect = docRect.union(Location.X, Location.Y, width, height);
+			});
+		}
+
+		console.log(docRect);
+		/*
+		pos = m_GroupsObjects.GetHeadPosition();
+		CGroupObject * pgroup = NULL;
+		while (pos) {
+			pgroup = (CGroupObject *)m_GroupsObjects.GetNext(pos);
+			docRect.UnionRect(docRect, pgroup -> m_rect);
+		}
+		return m_DocSize = CSize(docRect.right + 250, docRect.bottom + 250);*/
+	};
+
 	getBrowserSize = () => {
 		var myWidth = 0,
 			myHeight = 0;
@@ -328,41 +375,32 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 			width: myWidth
 		};
 
+		this.calcDocSize();
+
 		return size;
 	};
 
 	onMouseDown = (e: any) => {
-		const { stepPropsShown } = this.state;
-
-		console.log('mouse down');
-
-		if (stepPropsShown) return;
-
+		const { nav } = this.props.editorContext;
 		const coordinates = this.getCoordinates(e);
+		if (!this.isInside(coordinates)) {
+			this.setState({
+				isMouseDown: true,
+				mapSelection: {
+					x: coordinates.x,
+					y: coordinates.y,
+					height: 0,
+					width: 0
+				},
+				selected: {}
+			});
+		} else {
+			this.setState({
+				isMouseDown: true
+			});
+		}
 
-		//const mapSelection = this.isInsideMap(coordinates)
-		//	? {
-		//			x: coordinates.x,
-		//			y: coordinates.y,
-		//			height: 0,
-		//			width: 0
-		//		}
-		//	: null;
-
-		let svg = document.getElementById('map');
-
-		this.setState({
-			isMouseDown: true,
-			mapSelection: {
-				x: e.pageX - svg.offsetLeft,
-				y: e.pageY - svg.offsetTop,
-				height: 0,
-				width: 0
-			},
-			selected: {}
-		});
-
-		if (this.props.nav === mapObjectSelection.User) {
+		if (nav === mapObjectSelection.User) {
 			const id = Math.floor(Math.random() * 1000000);
 			let user = {
 				$type: 'Ultimus.ProcessMap.UserStep, Ultimus.ProcessMap',
@@ -377,11 +415,10 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 			};
 
 			this.setDefaultMapObjectSelection();
-
 			this.props.actions.mapActions.addStep(user);
 		}
 
-		if (this.props.nav === mapObjectSelection.Junction) {
+		if (nav === mapObjectSelection.Junction) {
 			const id = Math.floor(Math.random() * 1000000);
 			let junction = {
 				$type: 'Ultimus.ProcessMap.JunctionStep, Ultimus.ProcessMap',
@@ -396,7 +433,6 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 			};
 
 			this.setDefaultMapObjectSelection();
-
 			this.props.actions.mapActions.addStep(junction);
 		}
 	};
@@ -416,9 +452,8 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 	};
 
 	onMouseMove = (e: any) => {
-		const { dragging, isMouseDown, selected, drag_line, sourcestep, stepPropsShown, mapSelection } = this.state;
-
-		if (stepPropsShown) return;
+		e.preventDefault();
+		const { dragging, isMouseDown, selected, sourcestep, mapSelection } = this.state;
 
 		const { map } = this.props;
 
@@ -426,15 +461,11 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 
 		const coordinates = this.getCoordinates(e);
 
-		if (isMouseDown) {
-			const svg = document.getElementById('map');
-
-			let x: any = mapSelection.x !== 9999 ? mapSelection.x : e.pageX - svg.offsetLeft;
-			let y: any = mapSelection.x !== 9999 ? mapSelection.y : e.pageY - svg.offsetTop;
-			let width = e.pageX - svg.offsetLeft - x;
-			let height = e.pageY - svg.offsetTop - y;
-
-			//console.log(x, y, width, height, svg.offsetLeft, svg.offsetTop);
+		if (Object.keys(selected).length === 0 && mapSelection.x !== 9999) {
+			let x: any = mapSelection.x !== 9999 ? mapSelection.x : coordinates.x;
+			let y: any = mapSelection.x !== 9999 ? mapSelection.y : coordinates.y;
+			let width = coordinates.x - x;
+			let height = coordinates.y - y;
 
 			this.setState({
 				mapSelection: {
@@ -444,72 +475,63 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 					width: width
 				}
 			});
-		}
+		} else if (selected === null) {
+			console.log('not selecte');
+		} else if (this.getDrawLink() && sourcestep) {
+			let step = this.getStep(sourcestep);
 
-		if (mapSelection) {
-		} else {
-			if (selected === null) {
-				console.log('not selecte');
-			} else if (this.getDrawLink() && sourcestep) {
-				let step = this.getStep(sourcestep);
+			if (!step) return;
 
-				if (!step) return;
+			let startX = step.Location.X + ImageConst.CX / 2 + ImageConst.IMAGEWIDTH / 2 + ImageConst.ANCHOROFFSET;
+			let startY = step.Location.Y + ImageConst.CY / 2;
 
-				let startX = step.Location.X + ImageConst.CX / 2 + ImageConst.IMAGEWIDTH / 2 + ImageConst.ANCHOROFFSET;
-				let startY = step.Location.Y + ImageConst.CY / 2;
+			const drag_line = document.getElementById('drag_line');
+			// update drag line
+			drag_line.setAttribute('d', 'M' + startX + ',' + startY + 'L' + coordinates.x + ',' + coordinates.y);
+		} else if (!this.getDrawLink()) {
+			const steps = [ ...map.Steps ];
 
-				// update drag line
-				drag_line.attr('d', 'M' + startX + ',' + startY + 'L' + coordinates.x + ',' + coordinates.y);
-			} else if (!this.getDrawLink()) {
-				const steps = [ ...map.Steps ];
+			const deltaX = dragging ? e.pageX - dragging.x : 0;
+			const deltaY = dragging ? e.pageY - dragging.y : 0;
 
-				const deltaX = dragging ? coordinates.x - dragging.x : 0;
-				const deltaY = dragging ? coordinates.y - dragging.y : 0;
+			steps.filter(({ Id }) => selected[Id]).forEach((step) => {
+				let s = JSON.parse(JSON.stringify(step));
+				s.Location.X += deltaX;
+				s.Location.Y += deltaY;
 
-				if (!this.isInsideMap(coordinates)) return;
+				if (Array.isArray(s.Links) && s.Links.length > 0) {
+					s.Links.forEach((link: Link) => {
+						if (Array.isArray(link.Anchor) && link.Anchor.length > 0) {
+							link.Anchor.forEach((a: Anchor) => {
+								a.X += deltaX;
+								a.Y += deltaY;
+							});
+						}
+					});
+				}
+				this.props.actions.mapActions.updateStep(s);
+			});
 
-				steps.filter(({ Id }) => selected[Id]).forEach((step) => {
-					let s = JSON.parse(JSON.stringify(step));
-					s.Location.X += deltaX;
-					s.Location.Y += deltaY;
-					this.props.actions.mapActions.updateStep(s);
-				});
-
-				this.setState({ dragging: coordinates });
-			}
+			this.setState({ dragging: { x: e.pageX, y: e.pageY } });
 		}
 	};
 
 	onMouseUp = (event: any) => {
 		const {
-			//mapSelection,I
-			drag_line,
-			sourcestep,
-			stepPropsShown
+			sourcestep
 			//destinationstep
 		} = this.state;
 
-		if (stepPropsShown) return;
-
 		const { map } = this.props;
 
-		let selected = Object.assign({}, this.state.selected);
+		//let selected = Object.assign({}, this.state.selected);
 
-		this.setState({
-			dragging: null,
-			isMouseDown: false,
-			mapSelection: {
-				x: 0,
-				y: 0,
-				height: 0,
-				width: 0
-			},
-			selected
-		});
+		this.setSelection();
 
 		if (this.getDrawLink()) {
 			// hide drag line
-			drag_line.classed('hidden', true).style('marker-end', '');
+			const drag_line = document.getElementById('drag_line');
+			drag_line.setAttribute('d', 'M0,0 L0,0');
 
 			this.setDefaultMapObjectSelection();
 
@@ -554,6 +576,18 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 				}
 			}
 		}
+
+		this.setState({
+			dragging: null,
+			isMouseDown: false
+			//mapSelection: {
+			//	x: 9999,
+			//	y: 9999,
+			//	height: 0,
+			//	width: 0
+			//	},
+			//	selected
+		});
 	};
 
 	getStep = (step: any) => {
@@ -574,7 +608,6 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 		return () => {
 			//const rect = container.getBoundingClientRect();
 			const size = this.getBrowserSize();
-
 			this.setState({ size: size });
 		};
 	};
@@ -592,7 +625,7 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 		return (event: any) => {
 			event.stopPropagation();
 
-			const { selected, shiftPressed, drag_line, stepPropsShown } = this.state;
+			const { selected, shiftPressed, stepPropsShown } = this.state;
 
 			if (stepPropsShown) this.updateMap();
 
@@ -608,7 +641,7 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 			});
 
 			// reposition drag line
-			if (this.getDrawLink()) {
+			/*if (this.getDrawLink()) {
 				if (step.Name === 'End') return;
 
 				let startX = step.Location.X + ImageConst.CX / 2 + ImageConst.IMAGEWIDTH / 2 + ImageConst.ANCHOROFFSET;
@@ -619,7 +652,7 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 					.style('marker-end', 'url(#Triangle)')
 					.classed('hidden', false)
 					.attr('d', 'M' + startX + ',' + startY + 'L' + startX + ',' + startY);
-			}
+			}*/
 		};
 	};
 
@@ -696,6 +729,7 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 
 	public renderMap = (): JSX.Element => {
 		const { map, bpmLocale, playbackHistory } = this.props;
+		const { grid } = this.props.editorContext;
 		const { mapSelection, selected, size, frameIndex, playback } = this.state;
 		const style = { display: 'flex', justifyContent: 'space-between' };
 
@@ -722,6 +756,7 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 					stopDragging={this.stopDragging}
 					showStepProps={this.showStepProps}
 					size={size}
+					showGrid={grid > 0 ? true : false}
 				/>
 				<section>{this.renderProperty()}</section>
 			</div>
@@ -740,6 +775,7 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 
 	public renderMapView = (): JSX.Element => {
 		const { map, bpmLocale, playbackHistory } = this.props;
+		const { grid } = this.props.editorContext;
 		const { processName, incident } = this.props.params;
 		const { mapSelection, selected, size, frameIndex, playback, pause, enableNextBtn, enablePrevBtn } = this.state;
 		const hideSpeedDial = !this.props.params.playback;
@@ -761,6 +797,7 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 					stopDragging={this.stopDragging}
 					showStepProps={this.showStepProps}
 					size={size}
+					showGrid={grid > 0 ? true : false}
 				/>
 				{!hideSpeedDial ? (
 					<SpeedDials
@@ -831,7 +868,7 @@ const mapStateToProps = (state: any, ownProps: any) => {
 	return {
 		map: state.data.map,
 		playbackHistory: state.data.playbackHistory,
-		nav: state.nav,
+		editorContext: state.editorContext,
 		bpmLocale: state.localizedData,
 		isLoading: state.data.isLoading,
 		hasErrored: state.data.hasErrored,
@@ -868,7 +905,6 @@ interface IMapViewState {
 	selected: any;
 	shiftPressed: boolean;
 	toolbarHeight: number;
-	drag_line: any;
 	sourcestep: {};
 	destinationstep: {};
 	stepPropsShown: boolean;
@@ -886,7 +922,7 @@ interface IMapViewState {
 interface IMapViewProps {
 	map: MapData;
 	playbackHistory: PlaybackHistory;
-	nav: number;
+	editorContext: IEditorContext;
 	bpmLocale: BpmLocale[];
 	params: IParam;
 	actions: any;

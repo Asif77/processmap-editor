@@ -13,13 +13,14 @@ import {
 	GROUP_BPMN,
 	GROUP,
 	DEPARTMENT_BPMN,
-	DEPARTMENT /*, USER_STEP_SELECTED*/,
+	DEPARTMENT,
+	//USER_STEP_SELECTED,
 	USER_STEP_HOVER
 } from './MapImages';
 
 class UserStep extends GenericStep {
 	handleMouseDown = (e: any) => {
-		//let selection = d3.select(this.refs.image);
+		//let selection = d3.select<any, any>(this.refs.image);
 		//selection.attr('href', USER_STEP_SELECTED);
 	};
 
@@ -102,6 +103,8 @@ class UserStep extends GenericStep {
 					onMouseOut={this.handleMouseOut}
 					onMouseDown={this.handleMouseDown}
 					onTouchStart={this.handleTouchStart}
+					onMouseEnter={this.handleMouseEnter}
+					onMouseLeave={this.handleMouseLeave}
 				/>
 				<image
 					href={this.getStateImage()}

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { createStyles, makeStyles, Theme } from '@material-ui/core/styles';
 import AppBar from '@material-ui/core/AppBar';
 import Toolbar from '@material-ui/core/Toolbar';
@@ -7,7 +7,16 @@ import IconButton from '@material-ui/core/IconButton';
 import MenuIcon from '@material-ui/icons/Menu';
 import ToggleButton from '@material-ui/lab/ToggleButton';
 import ToggleButtonGroup from '@material-ui/lab/ToggleButtonGroup';
-import { CURSOR, USER_STEP, JUNCTION, MAPLET } from './MapImages';
+import { CURSOR, USER_STEP, JUNCTION, MAPLET, LINK, GRID, SNAPTO } from './MapImages';
+import { useSelector, useDispatch } from 'react-redux';
+import * as navActions from '../actions/navActions';
+import { mapObjectSelection } from './constant';
+import Divider from '@material-ui/core/Divider';
+
+import Popper, { PopperProps } from '@material-ui/core/Popper';
+import Fade from '@material-ui/core/Fade';
+import Paper from '@material-ui/core/Paper';
+import Draggable from 'react-draggable';
 
 const useStyles = makeStyles((theme: Theme) =>
 	createStyles({
@@ -22,16 +31,109 @@ const useStyles = makeStyles((theme: Theme) =>
 		},
 		buttonRoot: {
 			marginLeft: theme.spacing(12)
+		},
+		divider: {
+			margin: theme.spacing(1, 0.5)
+		},
+		back: {
+			background: 'white'
+		},
+		popper: {
+			margin: theme.spacing(1)
 		}
 	})
 );
 
 export default function ButtonAppBar() {
 	const classes = useStyles();
-	const [ selected, setSelected ] = React.useState('arrow');
+	const [ selected, setSelected ] = useState('arrow');
+	const [ gridSelected, setGridSelected ] = useState(0);
+	const nav = useSelector((state) => state.editorContext.nav);
+	const grid = useSelector((state) => state.editorContext.grid);
+	const dispatch = useDispatch();
+
+	const [ open, setOpen ] = React.useState(true);
+	const [ anchorEl, setAnchorEl ] = React.useState<null | HTMLElement>(null);
+
+	useEffect(
+		() => {
+			setToggleButton(nav);
+			return () => {
+				//cleanup
+			};
+		},
+		[ nav ]
+	);
+
+	useEffect(
+		() => {
+			setGridSelected(grid);
+		},
+		[ grid ]
+	);
+
+	const handleChange2 = (event: React.MouseEvent<HTMLElement>, newValue: number) => {
+		console.log(newValue);
+		if (newValue === 2) {
+		} else dispatch(navActions.gridSelection(gridSelected === 0 ? 1 : 0));
+		if (!open) {
+			console.log('open');
+			setAnchorEl(anchorEl ? null : event.currentTarget);
+			setOpen(true);
+		}
+	};
+
+	const setToggleButton = (nav) => {
+		switch (nav) {
+			case mapObjectSelection.Pointer:
+				setSelected('arrow');
+				break;
+			case mapObjectSelection.User:
+				setSelected('user');
+				break;
+			case mapObjectSelection.Junction:
+				setSelected('junction');
+				break;
+			case mapObjectSelection.Link:
+				setSelected('link');
+				break;
+			case mapObjectSelection.NewMap:
+				setSelected('new');
+				break;
+			case mapObjectSelection.PublishMap:
+				setSelected('pubplish');
+				break;
+			default:
+				setSelected('arrow');
+		}
+	};
 
 	const handleChange = (event: React.MouseEvent<HTMLElement>, newValue: string) => {
 		setSelected(newValue);
+
+		switch (newValue) {
+			case 'user':
+				dispatch(navActions.navSelection(mapObjectSelection.User));
+				break;
+			case 'junction':
+				dispatch(navActions.navSelection(mapObjectSelection.Junction));
+				break;
+			case 'link':
+				dispatch(navActions.navSelection(mapObjectSelection.Link));
+				break;
+			case 'arrow':
+				dispatch(navActions.navSelection(mapObjectSelection.Pointer));
+				break;
+			case 'publishmap':
+				dispatch(navActions.navSelection(mapObjectSelection.PublishMap));
+				break;
+			case 'new':
+				dispatch(navActions.navSelection(mapObjectSelection.NewMap));
+				break;
+			default:
+				dispatch(navActions.navSelection(mapObjectSelection.Pointer));
+				break;
+		}
 	};
 
 	return (
@@ -48,11 +150,14 @@ export default function ButtonAppBar() {
 						size="small"
 						value={selected}
 						className={classes.buttonRoot}
-						exclusive
 						onChange={handleChange}
+						exclusive
 					>
 						<ToggleButton value="arrow">
 							<img src={CURSOR} width="36" height="36" alt="" />
+						</ToggleButton>
+						<ToggleButton value="link">
+							<img src={LINK} width="36" height="36" alt="" />
 						</ToggleButton>
 						<ToggleButton value="user">
 							<img src={USER_STEP} width="36" height="36" alt="" />
@@ -64,8 +169,81 @@ export default function ButtonAppBar() {
 							<img src={JUNCTION} width="36" height="36" alt="" />
 						</ToggleButton>
 					</ToggleButtonGroup>
+					<Divider flexItem orientation="vertical" className={classes.divider} />
+					<ToggleButtonGroup size="small" value={gridSelected} onChange={handleChange2} exclusive>
+						<ToggleButton size="small" value={1} selected={gridSelected > 0 ? true : false}>
+							<img src={GRID} width="36" height="36" alt="" />
+						</ToggleButton>
+						<ToggleButton
+							size="small"
+							value={2}
+							selected={false}
+							disabled={gridSelected === 0 ? true : false}
+						>
+							<img src={SNAPTO} width="36" height="36" alt="" />
+						</ToggleButton>
+					</ToggleButtonGroup>
 				</Toolbar>
 			</AppBar>
+			{/*<Popper
+				open={open}
+				id="popper"
+				//anchorEl={anchorEl}
+				style={{ position: 'fixed', top: 70, left: 1500, width: 300, height: 200 }}
+				transition={true}
+				placement="right-end"
+			>
+				{({ TransitionProps }) => (
+					<Fade {...TransitionProps} timeout={350}>
+						<Paper elevation={3}>
+							<ToggleButtonGroup
+								size="small"
+								value={selected}
+								onChange={handleChange}
+								exclusive
+								className={classes.popper}
+							>
+								<ToggleButton value="arrow">
+									<img src={CURSOR} width="36" height="36" alt="" />
+								</ToggleButton>
+								<ToggleButton value="link">
+									<img src={LINK} width="36" height="36" alt="" />
+								</ToggleButton>
+								<ToggleButton value="user">
+									<img src={USER_STEP} width="36" height="36" alt="" />
+								</ToggleButton>
+								<ToggleButton value="maplet">
+									<img src={MAPLET} width="36" height="36" alt="" />
+								</ToggleButton>
+								<ToggleButton value="junction">
+									<img src={JUNCTION} width="36" height="36" alt="" />
+								</ToggleButton>
+							</ToggleButtonGroup>
+							<Divider flexItem orientation="horizontal" />
+							<ToggleButtonGroup
+								size="small"
+								value={gridSelected}
+								onChange={handleChange2}
+								exclusive
+								className={classes.popper}
+							>
+								<ToggleButton size="small" value={1} selected={gridSelected > 0 ? true : false}>
+									<img src={GRID} width="36" height="36" alt="" />
+								</ToggleButton>
+								<ToggleButton
+									size="small"
+									value={2}
+									selected={false}
+									disabled={gridSelected === 0 ? true : false}
+								>
+									<img src={SNAPTO} width="36" height="36" alt="" />
+								</ToggleButton>
+							</ToggleButtonGroup>
+						</Paper>
+					</Fade>
+				)}
+				</Popper>*/}
+  
 		</div>
 	);
 }

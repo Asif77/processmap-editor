@@ -73,9 +73,38 @@ class Map extends React.Component<IMap, IMapState> {
 
 	componentDidMount() {
 		window.addEventListener('resize', this.onWindowResize());
-
 		this.Viewer.fitToViewer();
 	}
+
+	getBrowserSize = () => {
+		var myWidth = 0,
+			myHeight = 0;
+		if (typeof window.innerWidth === 'number') {
+			//Non-IE
+			myWidth = window.innerWidth;
+			myHeight = window.innerHeight;
+		} else if (
+			document.documentElement &&
+			(document.documentElement.clientWidth || document.documentElement.clientHeight)
+		) {
+			//IE 6+ in 'standards compliant mode'
+			myWidth = document.documentElement.clientWidth;
+			myHeight = document.documentElement.clientHeight;
+		} else if (document.body && (document.body.clientWidth || document.body.clientHeight)) {
+			//IE 4 compatible
+			myWidth = document.body.clientWidth;
+			myHeight = document.body.clientHeight;
+		}
+
+		const { editable } = this.props.params;
+
+		let size = {
+			height: editable ? myHeight - 64 : myHeight,
+			width: myWidth
+		};
+
+		return size;
+	};
 
 	getTextObject = (id: string) => {
 		const { map } = this.props;
@@ -582,6 +611,7 @@ class Map extends React.Component<IMap, IMapState> {
 		this.setState({ isMouseDown: true });
 		console.log('mousedonw: ', e);
 	};
+
 	onMouseUp = (e: any) => {
 		this.setState({ isMouseDown: false });
 	};
@@ -592,8 +622,39 @@ class Map extends React.Component<IMap, IMapState> {
 		}
 	};
 
+	drawline = (x1, y1, x2, y2): JSX.Element => {
+		const points = x1 + ',' + y1 + ' ' + x2 + ',' + y2;
+		return (
+			<Polyline
+				id={points}
+				points={points}
+				stroke="LightGray"
+				markerStart={false}
+				markerMid={false}
+				markerEnd={false}
+				editable={false}
+			/>
+		);
+	};
+
+	drawGrid = (bounds, xfactor, yfactor): JSX.Element[] => {
+		const size = this.getBrowserSize();
+		bounds.Right = size.width;
+		bounds.Bottom = size.height;
+
+		let lines = [];
+		for (let i = bounds.Left; i < bounds.Right; i = i + xfactor) {
+			lines.push(this.drawline(i, bounds.Top, i, bounds.Bottom));
+		}
+		for (let j = bounds.Top; j < bounds.Bottom; j = j + yfactor) {
+			lines.push(this.drawline(bounds.Left, j, bounds.Right, j));
+		}
+
+		return lines;
+	};
+
 	render() {
-		const { map, mapSelection, size, playback } = this.props;
+		const { map, mapSelection, size, playback, showGrid } = this.props;
 		const { editable } = this.props.params;
 		const { Height, Width } = map;
 
@@ -614,8 +675,8 @@ class Map extends React.Component<IMap, IMapState> {
 		return (
 			<React.Fragment>
 				<ReactSVGPanZoom
-					width={size.width}
-					height={size.height}
+					width={size.width + 7000}
+					height={size.height + 7000}
 					background="white"
 					toolbarPosition="none"
 					miniaturePosition="none"
@@ -687,10 +748,19 @@ class Map extends React.Component<IMap, IMapState> {
 								<circle cx="5" cy="5" r="3" fill="black" />
 								<circle cx="5" cy="5" r="2" fill="white" />
 							</marker>
+
 							{this.defineSwimColorGradient()}
 							{this.defineTextFilter()}
 						</defs>
-
+						<path
+							id="drag_line"
+							d="M0,0 L0,0"
+							stroke="#8d9aad"
+							strokeWidth="1"
+							markerStart={'url(#Circle)'}
+							markerEnd={'url(#Triangle)'}
+						/>
+						{showGrid ? this.drawGrid({ Left: 0, Top: 0, Right: 2000, Bottom: 2000 }, 64, 64) : null}
 						{this.renderGroupObjects()}
 						{this.renderSteps()}
 						{this.renderTextObjects()}
@@ -726,6 +796,7 @@ interface IMap {
 	stopDragging: any;
 	showStepProps: any;
 	size: any;
+	showGrid: boolean;
 }
 
 interface ITranslation {

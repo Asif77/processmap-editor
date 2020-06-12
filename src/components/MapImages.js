@@ -75,6 +75,9 @@ import WARNING from '../images/warning.png';
 
 import END_ANCHOR from '../images/end-anchor-grey.svg';
 import CURSOR from '../images/cursor.svg';
+import LINK from '../images/link.svg';
+import GRID from '../images/grid.svg';
+import SNAPTO from '../images/snapto.svg';
 
 export {
 	ABORTED,
@@ -145,5 +148,8 @@ export {
 	END_ANCHOR,
 	CUSTOMFLOBOT,
 	CUSTOMFLOBOT_BPMN,
-	CURSOR
+	CURSOR,
+	LINK,
+	GRID,
+	SNAPTO
 };

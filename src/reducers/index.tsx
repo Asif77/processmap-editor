@@ -1,12 +1,12 @@
 import { combineReducers } from 'redux';
 import data from './mapViewReducer';
-import nav from './navReducer';
+import editorContext from './editorReducer';
 import localizedData from './localizedReducer';
 import ajaxCallsInProgress from './ajaxStatusReducer';
 
 const rootReducer = combineReducers({
 	data,
-	nav,
+	editorContext,
 	localizedData,
 	ajaxCallsInProgress
 });

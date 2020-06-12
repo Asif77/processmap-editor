@@ -214,6 +214,12 @@ export interface IParam {
 	playback: boolean;
 }
 
+export interface IEditorContext {
+	nav: number;
+	grid: number;
+	zoomFactor: number;
+}
+
 export interface BpmLocale {
 	Id: number;
 	LocaleType: number;

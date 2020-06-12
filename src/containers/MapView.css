@@ -7,7 +7,7 @@
 path.link {
 	fill: none;
 	/* stroke: #60b1fc; */
-	stroke: #8d9aad;
+	stroke: #0b65ec;
 	stroke-width: 1px;
 	cursor: default;
 }
@@ -21,7 +21,7 @@ path.link.dragline {
 }
 
 path.link.hidden {
-	stroke-width: 0;
+	stroke-width: 2;
 }
 
 /* This styles the title of the tooltip */

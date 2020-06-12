@@ -4,12 +4,11 @@ import * as React from 'react';
 import Toolbar from './Toolbar';
 import { IParam } from '../interface/map';
 
-
 class App extends React.Component<IAppProps, IAppState> {
 	constructor(props: IAppProps) {
 		super(props);
 
-		const qs = queryString.parse(this.props.location.search);		
+		const qs = queryString.parse(this.props.location.search);
 		let parser = document.createElement('a');
 		parser.href = window.location.href;
 
