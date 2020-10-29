@@ -35,7 +35,8 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 			'onWindowScroll',
 			'selectStep',
 			'stopDragging',
-			'showStepProps'
+			'showStepProps',
+			'onWheel'
 		);
 
 		this.state = {
@@ -106,6 +107,7 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 
 		window.addEventListener('scroll', this.onWindowScroll);
 		window.addEventListener('resize', this.onWindowResize(container));
+		window.addEventListener('wheel', this.onWheel);
 
 		const offset = {
 			x: container.offsetLeft,
@@ -620,6 +622,10 @@ class MapView extends React.Component<IMapViewProps, IMapViewState> {
 
 		this.setState({ scroll });
 	};
+
+	onWheel = (e) => {
+		window.scrollTo(window.scrollX,  window.scrollY-e.wheelDelta);		
+	}
 
 	selectStep = (id: any) => {
 		return (event: any) => {

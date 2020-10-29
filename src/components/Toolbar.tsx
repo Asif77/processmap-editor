@@ -12,6 +12,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import * as navActions from '../actions/navActions';
 import { mapObjectSelection } from './constant';
 import Divider from '@material-ui/core/Divider';
+import useScrollTrigger from '@material-ui/core/useScrollTrigger';
 
 import Popper, { PopperProps } from '@material-ui/core/Popper';
 import Fade from '@material-ui/core/Fade';
@@ -40,11 +41,39 @@ const useStyles = makeStyles((theme: Theme) =>
 		},
 		popper: {
 			margin: theme.spacing(1)
+		},
+		appBar: {
+		 boxShadow: '5'
 		}
 	})
 );
 
-export default function ButtonAppBar() {
+interface Props {
+  /**
+   * Injected by the documentation to work in an iframe.
+   * You won't need it on your project.
+   */
+  window?: () => Window;
+  children?: React.ReactElement;
+}
+
+function ElevationScroll(props: Props) {
+  const { children, window } = props;
+  // Note that you normally won't need to set the window ref as useScrollTrigger
+  // will default to window.
+  // This is only being set here because the demo is in an iframe.
+  const trigger = useScrollTrigger({
+    disableHysteresis: true,
+    threshold: 0,
+    target: window ? window() : undefined,
+  });
+
+  return React.cloneElement(children, {
+    elevation: trigger ? 4 : 0,
+  });
+}
+
+export default function ButtonAppBar(props: Props) {
 	const classes = useStyles();
 	const [ selected, setSelected ] = useState('arrow');
 	const [ gridSelected, setGridSelected ] = useState(0);
@@ -137,8 +166,10 @@ export default function ButtonAppBar() {
 	};
 
 	return (
+		
 		<div className={classes.root}>
-			<AppBar position="static">
+			<ElevationScroll {...props}>
+			<AppBar className={classes.appBar}>
 				<Toolbar variant="dense">
 					<IconButton edge="start" className={classes.menuButton} color="inherit" aria-label="menu">
 						<MenuIcon />
@@ -185,6 +216,7 @@ export default function ButtonAppBar() {
 					</ToggleButtonGroup>
 				</Toolbar>
 			</AppBar>
+			</ElevationScroll>
 			{/*<Popper
 				open={open}
 				id="popper"
